@@ -1,13 +1,10 @@
 <h4>
-/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@<br>
-* README       :   Optical Flow for Cell Motion independent of Cell Tracking <br>
+* Python       :   Optical Flow for Cell Motion independent of Cell Tracking<br>
 *<br>
 * PROGRAMMER   :   Timothy Tyree<br>
 * DATE         :   Fri 22 Nov 2019 <br>
 * PLACE        :   Rappel Lab @ UCSD, CA<br>
-*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@<br>
-*/<br>
-<h4/>
+</h4>
 
 <p>This is a module that is an ongoing project made for calculating and analyzing dense optical flow in microscopy video data that exhibits cell motion towards/away from a trajectory or around a trajectory.  It can clearly be generalized to other applications.  It primarily uses a dense inverse search (DIS) optical flow algorithm (see calc_flow).  </p>
 
@@ -22,6 +19,8 @@
 <p>Microscopy video data formats currently  supported are '.tiff'/'.tif' stacks (TODO: generalize inputs to a .mpg or .avi or .mp4 or .mov formats).  Video output functionality is currently supported with '.tiff' stacks compatable with ImageJ, '.avi', and '.mov'.  My inputs were differential interference contract (DIC) microscopy videos that had edges detected by scharr transform (see preprocess).</p>
 
 <p>I made this module for my physics PhD research on chemotaxis, and although it serves my purposes, it is reasonably well-documented and riddled with "#TODO: " comments describing simple and clear incremental improvements.  Test cases should also be developed. If you're interested in helping make this module more useful to more people, I strongly encourage you to fork me on GitHub at TimtheTyrant.  Have a nice day!</p>
+
+## Examples
 
 <p>Example 1: 
 #calculate texture of radial unit vectors, r_hat_mat, and radial vectors, r_c_mat<br>

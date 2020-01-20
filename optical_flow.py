@@ -11,14 +11,15 @@
 import pandas as pd
 import numpy as np 
 import pims
-from skimage.filters import scharr_h, scharr_v
+from skimage.filters import scharr_h, scharr_v, gaussian
 from joblib import Parallel, delayed
 import multiprocessing
 num_cores = multiprocessing.cpu_count()
 import tifffile
 from cv2 import drawMarker, calcOpticalFlowFarneback
 import cv2 as cv
-from tkinter import filedialog, Tk 
+from tkinter import filedialog, Tk
+from scipy.interpolate import CubicSpline 
 # import trackpy as tp
 # import skimage as sk
 
@@ -83,6 +84,7 @@ class OpticalFlowClient(object):
 		initialize optical flow client and specify any nondefault parameters
 		self.dot and self.cross methods separate flow about some origin specified by
 		self.position.
+		PARAMS_DEFAULT = {'navg':8, 'width':512, 'height':512, 'rthresh': 0, 'lamda':1.33, 'dt':1/3, 'method':'dis'}
 	'''
 	def __init__(self,  **kwargs):
 		'''set client parameters'''
@@ -128,6 +130,18 @@ class OpticalFlowClient(object):
 	#  * Code for optical flow
 	#  *========================================================================
 	#  */
+	def write(self, save_file_name, texture):
+		'''appends texture to save_file_name as a .tiff'''
+		rgba = texture
+		tifffile.imsave(save_file_name, rgba, rgba.shape, **self.save_params)
+		return self
+
+	def append_texture(self, save_file_name, texture):
+		'''appends texture to save_file_name as a .tiff'''
+		rgba = texture
+		tifffile.imsave(save_file_name, rgba, rgba.shape, **self.save_params)
+		return self
+
 	def write(self, save_file_name, flow, r_hat_mat):
 		'''rg channels are flow.
 		ba channels are r_hat_mat
@@ -135,6 +149,8 @@ class OpticalFlowClient(object):
 		rgba = np.concatenate([flow,r_hat_mat], axis=2)
 		tifffile.imsave(save_file_name, rgba, rgba.shape, **self.save_params)
 		return self
+
+
 
 	def write_list(self, save_file_name, flow_lst, r_hat_mat_lst):
 		'''TODO: streamline this using nb sketches.'''
@@ -299,6 +315,7 @@ class OpticalFlowClient(object):
 
 	def annulus_sum(self,txt,rtxt,r1,r2):
 		'''returns the sum of texture txt in the annulus r1:r2, with rtxt as the texture fo radial distances from the origin.
+		Sum of all channels contained in axis=2 of txt is returned.
 		'''
 		return txt[(rtxt>r1) & (r2>rtxt)].sum()
 		 
@@ -828,11 +845,136 @@ class OpticalFlowClient(object):
 		fx, fy = flow[y,x].T
 		lines = np.vstack([x, y, x+fx, y+fy]).T.reshape(-1, 2, 2)
 		lines = np.int32(lines + 0.5)
-		vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-		cv2.polylines(vis, lines, 0, (0, 255, 0))
+		vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+		cv.polylines(vis, lines, 0, (0, 255, 0))
 		for (x1, y1), (_x2, _y2) in lines:
-			cv2.circle(vis, (x1, y1), 1, (0, 255, 0), -1)
+			cv.circle(vis, (x1, y1), 1, (0, 255, 0), -1)
 		return vis
+
+	def interpolate_trajectory(self, df, f1=None, f2=None):
+	    """returns a pandas.DataFrame with exactly one position for every frame. 
+	    Positions are calculated by cubic spline interpolation.
+	    df is a pandas.DataFrame of pixel positions for sparse frames.
+	    f1 is the first frame number to interpolate, and is the first value in df.frame by default.
+	    f2 is the last frame number to interpolate, and is the last value in df.frame by default.
+	    Nota Bene: it is always good to plot your interpolations before relying on them.  
+	    Consider the following usage example:
+	    cf = OpticalFlowClient.interpolate_trajectory(df)
+	    plt.scatter(x=cf.x, y=cf.y, c=cf.frame, cmap='Blues')
+	    plt.scatter(x=df.x, y=df.y, c='r')
+	    """
+	    knots= df.frame.values
+	    if f1==None:
+	        f1   = knots.min(); 
+	    if f2==None:
+	        f2   = knots.max()
+	    x_values   = df.x
+	    y_values   = df.y
+	    xSpl = CubicSpline(knots,x_values); ySpl = CubicSpline(knots,y_values)
+	    f    = np.arange(f1,f2)
+	    x    = xSpl(f)
+	    y    = ySpl(f)
+	    cf = pd.DataFrame({'frame':f,'x':x,'y':y})
+	    return cf
+
+	def time_average_then_spatial_sum(self, texture_lst, r1,r2, navg=10, columns=None, units=None, lamda=None, dt=None, rmat_col = 2):
+	    '''returns a list of dictionaries with a field for each channel in texture_lst. texture_lst is a list of textures.
+	    dictionary values contain the sum over the annulus from r1 to r2 of the navg-frame moving average of texture_lst.
+	    columns == None is equivalent to columns = ['in', 'out', 'r', 'area']
+	    units == None is equivalent to units   = [lamda/dt, lamda/dt, lamda, lamda**2]
+	    dt == None is equivalent to dt=self.dt is the time between two frames.
+	    lamda == None is equivalent to lamda = self.lamda is the distance between two pixels.
+	  	rmat_col is the axis int that refers to rmat.
+	    '''
+	    if lamda==None:
+	    	lamda = self.lamda
+	    if dt == None:
+	    	dt = self.dt
+
+	    #idiot proof the calculations here. 
+	    assert(r1<=r2)
+	    channel_no = texture_lst[0].shape[-1]
+	    if columns==None:
+	        columns = ['in', 'out', 'r', 'area']
+	    assert(len(columns)==channel_no)
+	    if units==None:
+	        units   = [lamda/dt, lamda/dt, lamda, lamda**2]
+	    assert(len(units)==channel_no)
+	    #time average then take sum over annulus
+	    start = time.time()
+	    dict_out_lst = []
+	    inputs = np.arange(navg,len(texture_lst))
+	    for f in inputs:
+	        avg_txt = self.average_texture_list(texture_lst[f-navg:f])
+	        rmat = avg_txt[..., rmat_col]
+	        values = []
+	        for val_no in np.arange(channel_no):
+	            values.append(self.annulus_sum(avg_txt[...,val_no], rmat, r1, r2)*units[val_no])
+	        dict_out_lst.append(dict(zip(columns, values)))
+	    end = time.time()
+	    print(f"{np.around(end-start)} seconds elapsed time averaging and then summing over annulus from {int(r1//1)} to {int(r2//1)} pixels.")
+	    return dict_out_lst
+
+	def reset_flow_lst(self):
+		#TODO: make function to reset flow_lst
+		self.flow_lst = []
+		return self
+
+	def create_radial_flow_texture_list(self, df, edges, trialnum, sigma=3):
+	    '''calculate radial and perpendicular flow.
+	     sigma = 2 #for 4X data works.
+	     sigma = 3 #for 10X data works..'''
+	    # self = OpticalFlowClient(dt=dt)
+	    file_name_radial = 'flow_radial_'+trialnum+'.tiff'
+	    try:
+	        os.remove(file_name_radial)
+	    except:
+	        pass
+
+	    #NB: requires edges and df as arguments
+	    #TODO: make sure that flow_list is appended to only here in the module
+	    start = time.time()
+	    self.flow_lst = []
+	    flow_lst = self.flow_lst
+	    f_values = df.frame.values
+	    for frm in f_values[:-1]:
+	        # get radial coordinates
+	        position  = self.get_centroid(frm,df)
+	        rhat,rmat = self.get_r_hat_mat(position)    
+
+	        # get flow field in radial coordinates
+	        #TODO: check that I'm not setting the turnwise channel to zero accidently.  It looks black everywhere while ws does not.
+	        #     flow_tw, flow_ws  = self.cross(flow, rhat)
+	        flow      = self.calc_flow(edges[frm+1],edges[frm])
+	        flow_out, flow_in = self.dot(flow,rhat)
+
+	        #raw fret channel (should already be uint16)
+	        #     fret_channel = fretframes[frm].astype('uint16')
+
+	        #binary area channel
+	        fltr     = edges[frm]/2+edges[frm+1]/2
+	        fltr     = gaussian(fltr, sigma=sigma)
+	        fltr[fltr<20] = 0
+	        fltr[fltr>=20] = 1
+	        area_channel = fltr#pims.frame.Frame(fltr.astype('uint16'))
+
+	        #filter off-cell flow 
+	        output_texture = np.stack([(area_channel*flow_in).astype('float32'), 
+	                                   (area_channel*flow_out).astype('float32'),
+	                                  rmat.astype('uint8'),
+	                                  area_channel.astype('uint8')], axis=2)
+	        #include original frame_no metadata
+	        #TODO: fix ^this in self.write, it's not working
+	        #     flow_radial       = pims.frame.Frame(flow_radial, frame_no = frm)
+
+	        #stack to rgba frames and write to files
+	        self.append_texture(file_name_radial  ,output_texture)
+	    end = time.time()
+	    print("{} seconds elapsed calculating/exporting radial flow textures".format(np.around(end-start,1)))
+	    return file_name_radial
+
+
+
 
 	def run_tests(self, **kwargs):
 		'''test cases for the optical client.'''
@@ -859,7 +1001,7 @@ class OpticalFlowClient(object):
 		assert(flow!=None)
 		flow_in, flow_out  = of.dot(flow, r_hat_mat)
 		assert(flow_in!=None)
-		img = of.highlight(position=(x_coord, y_coord), flow_in=flow_in, flow_out=flow_out, background_frame2)
+		img = of.highlight(position=(x_coord, y_coord), flow_in=flow_in, flow_out=flow_out, background_frame=frame_2)
 		assert(img!=None)
 		print('all test cases passed!')
 		return True

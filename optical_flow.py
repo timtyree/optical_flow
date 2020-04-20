@@ -106,7 +106,8 @@ class OpticalFlowClient(object):
 		self.width     = PARAMS['width']
 		self.fps       = 8#24
 		self.height    = PARAMS['height']
-		self.angthresh = np.sqrt(0.5)#equal parts perpendicular and radial
+		# self.angthresh = np.sqrt(0.5)#equal parts perpendicular and radial
+		self.angthresh = 0#all in/out flow considered
 		self.minthresh = 1#set minimum threshold flow magnitude for consideration
 		#set optical flow parameters for Farneback optical flow
 		OF_PARAMS_DEFAULT = {'pyr_scale': 0.5, 'levels':3 , 'winsize': 15, 'iterations': 3, 'poly_n': 5, 'poly_sigma':1.2, 'flags':0}
@@ -552,6 +553,7 @@ class OpticalFlowClient(object):
 		
 		navg      = self.navg
 		r_thresh  = self.r_thresh
+		angthresh = self.angthresh
 
 		f_init = frm
 		f_final= f_init+navg
@@ -601,7 +603,8 @@ class OpticalFlowClient(object):
 
 			#define flow as out/in if it is within 45degrees of directly out/in
 			# <--> v_r/vtot = CI < np.sqrt(0.5)
-			angthresh = np.sqrt(0.5)
+			# angthresh = 0#all in/out flow considered
+			# angthresh = np.sqrt(0.5)#45 degree bins
 			#remove small flows under threshold
 			# flow_out[flow_out<1] = 0
 

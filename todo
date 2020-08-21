@@ -1,0 +1,7 @@
+TODO: time series analysis of near/min/far fluor. intens using the difference of phase in a phase angle time series
+Hint: https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.ndimage.filters.laplace.html
+
+#TODO: compute stiffness matrix of displacement configuration, U?
+from spharapy.trimesh: Triangular Mesh Data import stiffnessmatrix
+
+#TODO: compute the intrinsic dimension of the approach to equilibrium via the newmark method

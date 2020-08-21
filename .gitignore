@@ -2,3 +2,6 @@
 *.pyc
 horizontal_cell_motion_data copy/pos1234_C0.tif
 *.pyc
+*.jpg
+*.avi
+*.tif

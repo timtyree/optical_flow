@@ -5,3 +5,5 @@ Hint: https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.ndimage.
 from spharapy.trimesh: Triangular Mesh Data import stiffnessmatrix
 
 #TODO: compute the intrinsic dimension of the approach to equilibrium via the newmark method
+
+https://youtu.be/ar5YtgiXfNI?t=961

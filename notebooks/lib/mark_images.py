@@ -67,14 +67,14 @@ def make_input_image(img, save_file_name, message = None, time_stamp = None, x_s
 
 def make_input_image_list(time_stamp_lst,file_name_pic_lst):
     '''passes arguments to make_input_image, returns True.'''
-    start = time.time()
+    # start = time.time()
     for time_stamp, file_name_pic in zip(time_stamp_lst, file_name_pic_lst):
         save_file_name = file_name_pic.replace('.png', '_formatted.png')
         img = pims.image_reader.imread(file_name_pic)
         img = pims.frame.Frame(img)
         make_input_image(img, save_file_name, message=None, time_stamp=time_stamp, y_start = 490);
-    end = time.time()
-    print('{} seconds elapsed marking images'.format(np.around(end-start,1)))
+    # end = time.time()
+    # print('{} seconds elapsed marking images'.format(np.around(end-start,1)))
     return True
     # def mark_input_image(self, img, position = Nonecolor = None, time_stamp = None, save_file_name = None):)
     """mark the input image, img, at position needletip with an x, paint cell 

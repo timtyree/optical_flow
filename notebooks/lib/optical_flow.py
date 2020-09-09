@@ -517,8 +517,7 @@ class OpticalFlowClient(object):
 		dx_mat = x_mat - xc
 		dy_mat = y_mat - yc
 		r_c_mat  = np.sqrt(dx_mat**2+dy_mat**2)
-		boo      = (r_c_mat>=1)
-		# r_hat_mat   = dr_mat
+		boo      = (r_c_mat>=1)#the origin doesn't like this
 		r_hat_mat_x = np.divide(dx_mat,r_c_mat, where=boo)
 		r_hat_mat_y = np.divide(-dy_mat,r_c_mat, where=boo)#flip y axis
 		r_hat_mat   = np.stack([r_hat_mat_x,r_hat_mat_y], axis=2)

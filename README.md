@@ -4,7 +4,7 @@ Optical Flow for Cell Motion independent of Single Cell Tracking
 <h3>
 The Rappel Lab at the University of California, San Diego<br>
 This repository was created/is maintained by Timothy Tyree<br>
-The manuscript associated with this repository may be found [manuscript in review]<br>
+The manuscript associated with this repository may be found [here](https://www.researchgate.net/publication/348951437_Cell_dispersal_by_localized_degradation_of_a_chemoattractant)<br>
   </h3>
 
 <p>This repository contains a module of python functions. It is an ongoing project, and you are welcome to collaborate! The purpose of this repository is for computing and analyzing dense optical flow from raw microscopy video data.  The preprocessing is tuned for a differential interference contrast microscopy experiemental setup, and the analysis is geared towards video data that exhibits cell motion towards/away from a trajectory that can be taken to be stationary, for simplicity.  I encourage you to apply these analytical methods to other applications.  It primarily uses a dense inverse search (DIS) optical flow algorithm (see optical_flow.OpticalFlowClient.calc_flow).</p>

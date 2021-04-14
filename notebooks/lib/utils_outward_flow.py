@@ -106,13 +106,13 @@ def calc_sharp_optical_flow(img,img_before, position, dt, frm = -1,
 	flow_out, flow_in = mydot(flow, rhat)
 
 	# #blurred binary cell area mask
-	# fltr     = edges[frm]/2+edges[frm+1]/2
+	# fltr     = img/2+img_before/2
 	# fltr     = gaussian(fltr, sigma=sigma)
-	# fltr[fltr<20] = 0
-	# fltr[fltr>=20] = 1
+	# fltr[fltr< thresh] = 0
+	# fltr[fltr>=thresh] = 1
 	# area_channel = fltr#pims.frame.Frame(fltr.astype('uint16'))
-	if area_channel is None:
-		area_channel = img/np.max(img)
+	# if area_channel is None:
+	# 	area_channel = img/np.max(img)
 
 	#filter off-cell flow and return 
 	output_texture = np.stack([(area_channel*flow_in).astype('float32'), 
@@ -317,11 +317,12 @@ class Worker(object):
 	def dis_client(self):
 		return self.dis
 
-def my_input_file_name_to_highlight(input_file_name, **kwargs):
+def my_input_file_name_to_highlight(input_file_name, dist_0=0, use_green_channel = True, **kwargs):
 	'''if a blue figure is returnd, check that vmin == - vmax'''
 	#initialize for a given frame
-	dt = kwargs['dt']
-	worker = Worker(lamda=kwargs['lamda'], dt=dt)
+	dt    = kwargs['dt']
+	lamda = kwargs['lamda']
+	worker = Worker(lamda=lamda, dt=dt)
 	of  = worker.optical_flow_client()
 	dis = worker.dis_client()
 	asserting = worker.asserting
@@ -350,15 +351,22 @@ def my_input_file_name_to_highlight(input_file_name, **kwargs):
 	#import from a folder of preprocessed frames stored as .png's
 	current, previous, previous_previous = load_input_grayscale_data_second_order(input_file_name)
 	#convert to grayscale uint8 (as required by dis.calc *sad face* )
-	current = current[...,0].astype('uint8')
-	previous = previous[...,0].astype('uint8')
-	previous_previous = previous_previous[...,0].astype('uint8')
-	area_channel = current.copy()
+	current = current.astype('uint8')
+	previous = previous.astype('uint8')
+	previous_previous = previous_previous.astype('uint8')	
+	
+	try:
+		#compute the flow (redunant)
+		current_flow = dis.calc(previous_previous, previous, flow = None)
+		new_flow     = dis.calc(previous, current, flow = current_flow)
+	except Exception as e: 
+		current = current[...,0].astype('uint8')
+		previous = previous[...,0].astype('uint8')
+		previous_previous = previous_previous[...,0].astype('uint8')
 
-	#compute the flow
-	current_flow = dis.calc(previous_previous, previous, flow = None)
-	new_flow = dis.calc(previous, current, flow = current_flow)
-
+		current_flow = dis.calc(previous_previous, previous, flow = None)
+		new_flow     = dis.calc(previous, current, flow = current_flow)
+	
 	#  compute the flow_out and the flow_in
 	flow_radial = calc_sharp_optical_flow(img=current,img_before=previous, 
 										  position = position, dt=dt, frm = frm, 
@@ -366,8 +374,21 @@ def my_input_file_name_to_highlight(input_file_name, **kwargs):
 										  img_before_before = previous_previous, of=of)
 	flow_out = flow_radial[...,1]
 	flow_in = flow_radial[...,0]
+	area_channel = current.copy()
 
 	image = get_image(frames, frm)
+
+	if use_green_channel:
+		#get the green channel
+		os.chdir(kwargs['data_dir'])
+		imgs = pims.TiffStack(kwargs['fret_dir'])
+		input_array = imgs[frm]
+		green_channel = get_green_channel_from(input_array, baseline = 1000,  x_shiftby = 0, rotateby = 0)#, x_shiftby = 2, rotateby = 15)
+		boo=~np.isfinite(green_channel)
+		green_channel[boo]=0.
+		image[...,1] *= green_channel/2+1
+
+
 	fig = highlight_flow_bwr(image, flow_in, kwargs['vmin'], kwargs['vmax'], figsize = (10,10), mydpi = 512/10)
 
 
@@ -397,7 +418,7 @@ def compute_flow_out(flow, position, **kwargs):
 	return flow_radial
 
 
-def input_to_highlighted_png(input_file_name, **kwargs):
+def input_to_highlighted_png(input_file_name, dist_0=0, use_green_channel=True, **kwargs):
 	'''if a blue figure is returnd, check that vmin == - vmax'''
 	#get frame number, frm, for a given file_name
 	# from cv2 import drawMarker
@@ -418,21 +439,48 @@ def input_to_highlighted_png(input_file_name, **kwargs):
 	# compute outward flow
 	os.chdir(kwargs['tmp_dir'])
 	current, previous, previous_previous = load_data(input_file_name)
-	current = current[...,1].astype('uint8')
-	previous = previous[...,1].astype('uint8')
-	previous_previous = previous_previous[...,1].astype('uint8')
-
+	# current = current[...,1].astype('uint8')
+	# previous = previous[...,1].astype('uint8')
+	# previous_previous = previous_previous[...,1].astype('uint8')
+	current = current.astype('uint8')
+	previous = previous.astype('uint8')
+	previous_previous = previous_previous.astype('uint8')
 	flow = compute_flow(current, previous, previous_previous, **kwargs)
+
 	position = df.loc[df.frame==frm][['x','y']].values.T
 	area_channel = current.copy()
 
 	flow_radial = compute_flow_out(flow, position, area_channel = area_channel, frm=frm, **kwargs)
 
 	image = get_image(frames, frm)
+
+	if use_green_channel:
+		#get the green channel
+		os.chdir(kwargs['data_dir'])
+		imgs = pims.TiffStack(kwargs['fret_dir'])
+		input_array = imgs[frm]
+		green_channel = get_green_channel_from(input_array, baseline = 1000,  x_shiftby = 0, rotateby = 0)#, x_shiftby = 2, rotateby = 15)
+		boo=~np.isfinite(green_channel)
+		green_channel[boo]=0.
+		image[...,1] *= green_channel/4+1
+		image[...,0] /= green_channel/4+1
+		image[...,2] /= green_channel/4+1
+
 	# flow_out = flow_radial[...,1]
 	flow_in = flow_radial[...,0]
-	lograt_ = get_lograt_out(-1.*flow_in, area_channel, baseline = 0.01)
-	fig = highlight_flow_bwr(image, lograt_, vmin = kwargs['vmin'], vmax = kwargs['vmax'], figsize = (10,10), mydpi = 512/10)
+	# lograt_ = get_lograt_out(-1.*flow_in, area_channel, baseline = 0.01)
+	# lograt_[boo] = 0.
+	signal = -1.*flow_in #lograt_
+
+	#set signal values in distances within a distance dist_0 to zero
+	r0 = dist_0/kwargs['lamda'] #pixels
+	# if of is None:
+	of = OpticalFlowClient(dt=kwargs['dt'])
+		# kwargs['of'] = of
+	rhat,rmat = of.get_r_hat_mat(position)
+	boo = rmat<r0
+	signal[boo] = 0.
+	fig = highlight_flow_bwr(image, signal, vmin = kwargs['vmin'], vmax = kwargs['vmax'], figsize = (10,10), mydpi = 512/10)
 
 	#save fig as .png in tmp2
 	if input_file_name.find('tmp/preprocessed_snapshot')==-1:
@@ -448,8 +496,9 @@ def input_to_highlighted_png(input_file_name, **kwargs):
 	plt.close()
 	return img_fn
 
-def plot_figure_and_save(img, save_marked_fig_dir, **kwargs):
-	'''Example Usage: mark a figure
+def plot_figure_and_save(img, save_marked_fig_dir,fontsize = 50, xy=(.2,.9),xytext=(.22,.92),
+	save=True,  **kwargs):
+	'''Example Usage: plot a figure, annotating with time_stamp, and save.
 	retval = plot_figure_and_save(img, save_marked_fig_dir, **kwargs)
 	'''
 	lst = save_marked_fig_dir.split('.')
@@ -457,43 +506,39 @@ def plot_figure_and_save(img, save_marked_fig_dir, **kwargs):
 	frm = int(eval(lst[-2]))
 
 	tme = kwargs['dt']*(frm-kwargs['time_origin_frameno'])
-	time_stamp = f"t = {+int(tme)}:00 min"
-	#     time_stamp = f't = {+int(tme):3d} minutes'
-	fig, ax = plt.subplots(1)
-	fontsize = 19
-	save=True
-	
-#     rect = patches.Rectangle((400,25),50/lamda,5, edgecolor='w', facecolor="w")
-	rect = patches.Rectangle((420,25),50/kwargs['lamda'],5, edgecolor='w', facecolor="w")
+	time_stamp = f"t = {int(tme):+d}:00 min"
+	#     time_stamp = f't = {+int(tme):3d}minutes'
+
+	#plot fig
+	fig, ax = plt.subplots(1, figsize=(10,10))
+	#     rect = patches.Rectangle((400,25),50/lamda,5, edgecolor='w', facecolor="w")
+	rect = patches.Rectangle((450,20),50/kwargs['lamda'],10, edgecolor='w', facecolor="w")
 	ax.imshow(img)
-	tme = kwargs['dt']*(frm-kwargs['time_origin_frameno'])
 	ax.annotate(text=time_stamp,
-			   xy=(.2,.9),xytext=(.2,.9),
+			   xy=xy,xytext=xytext,
 				textcoords='figure fraction',
 			   fontsize=fontsize,
 			   color='w',
 			   fontweight='bold')
-#     ax.annotate(text=f'red = in, blue = out',
-#                xy=(.2,.04),
-#                 textcoords='figure fraction',
-#                 xytext=(.2,.04),
-#                fontsize=fontsize,
-#                color='w',
-#                fontweight='bold')
+	#     ax.annotate(text=f'red = in, blue = out',
+	#                xy=(.2,.04),
+	#                 textcoords='figure fraction',
+	#                 xytext=(.2,.04),
+	#                fontsize=fontsize,
+	#                color='w',
+	#                fontweight='bold')
 	plt.tight_layout()
 	#            **kwargs)
 	# Displays an image
-
-
 	ax.add_patch(rect)
 	ax.axis('off')
 	plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 	if not save:
 		plt.show()
 	else:
-		plt.savefig(save_marked_fig_dir, dpi =  512/5)
+		plt.savefig(save_marked_fig_dir, dpi =  512/10)
 		plt.close()
-	return True
+	return save_marked_fig_dir
 # #save fig as .png in tmp2
 # save_marked_fig_dir = input_file_name.replace('tmp/preprocessed_snapshot','tmp2/highlighted_snapshot')
 # assert(save_marked_fig_dir != input_file_name)
@@ -518,8 +563,9 @@ def mark_from_highlighted_snapshot_png(input_file_name, **kwargs):
 	# plt.show()
 	
 	# plt.imshow(img)
-def mark_image(img, frm, save_marked_fig_dir, **kwargs):
-	'''add the yellow x to the figure'''
+def mark_image(img, frm, save_marked_fig_dir, color = (1,1,0,1), **kwargs):
+	'''add the yellow x to the figure.
+	default color is yellow.'''
 	#time_stamp is not the message
 	#mark img with a scale bar
 	lst = save_marked_fig_dir.split('.')
@@ -528,14 +574,18 @@ def mark_image(img, frm, save_marked_fig_dir, **kwargs):
 	os.chdir(kwargs['data_dir'])
 	df = pd.read_csv(kwargs['cluster_dir'])
 
-	#simple scale bar
-	l = int(50/lamda)
-	img = cv.rectangle(img,(400,40),(400+l,30),(255,255,255),-1)
+	# #simple scale bar
+	# l = int(50/kwargs['lamda'])
+	# img = cv.rectangle(img,(400,40),(400+l,30),(255,255,255),-1)
 
 	#mark img with a yellow marker
 	position = df.loc[df.frame==frm][['x','y']].values.T
+	# position = df.loc[df.frame==frm+1][['x','y']].values.T
+	
+	if len(position)<2:
+		return False
 	drawMarker(img, position = (int(position[0]),int(position[1])), 
-			   color = (1,1,0,1), markerType = cv.MARKER_TILTED_CROSS , 
+			   color = color, markerType = cv.MARKER_TILTED_CROSS , 
 			   markerSize = 15, thickness = 2, line_type = cv.LINE_AA)
 	return img
 
@@ -552,6 +602,7 @@ def measure_outward_flow_in_range(flow, area_channel, x0,y0,r1=100,r2=300):
 	of = OpticalFlowClient(dt=dt)
 	r_hat_mat, r_c_mat = of.get_r_hat_mat(position)
 	boo = (r_c_mat>=r1 ) & (r_c_mat<=r2  )
+
 
 	#get total component
 	length = np.sqrt(np.multiply(flow[...,0],flow[...,0])+np.multiply(flow[...,1],flow[...,1]))
@@ -579,7 +630,7 @@ def measure_outward_flow_in_range(flow, area_channel, x0,y0,r1=100,r2=300):
 	avg_in  = float(np.median(-flow_out[booku]))
 	return avg_out, avg_in, avg_ci, avg_ln
 
-def input_to_measures ( input_file_name, **kwargs):
+def input_to_measures ( input_file_name, thresh=0.5,  **kwargs):
 	#get frame number, frm, for a given file_name
 	lst = input_file_name.split('.')
 	assert(len(lst)>2)
@@ -595,7 +646,20 @@ def input_to_measures ( input_file_name, **kwargs):
 	position = df.loc[df.frame==frm][['x','y']].values.T
 	# compute the measures of flow
 	flow = compute_sharp_optical_flow(current, previous, previous_previous, of=None, **kwargs)
-	avg_out, avg_in, avg_ci, avg_ln = measure_outward_flow_in_range(flow, area_channel, x0=position[1],y0=position[0],r1=100,r2=300)
+	
+	#blurred binary cell area mask as area_channel
+	fltr     = np.max(current+previous, 1)
+	fltr     = gaussian(fltr, sigma=3)#sigma)
+	fltr[fltr< thresh] = 0
+	fltr[fltr>=thresh] = 1
+	area_channel = fltr#pims.frame.Frame(fltr.astype('uint16'))
+
+	#default sharp area_channel
+	# if area_channel is None:
+	# 	area_channel = img/np.max(img)
+
+
+	avg_out, avg_in, avg_ci, avg_ln = measure_outward_flow_in_range(flow, area_channel, x0=position[1],y0=position[0],r1=kwargs['r1'],r2=kwargs['r2'])
 	return {frm : (avg_out, avg_in, avg_ci, avg_ln)}
 # col_names = ['avg_out', 'avg_in', 'avg_ci', 'avg_ln']
 

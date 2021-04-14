@@ -11,7 +11,7 @@ import time
     # return self
 
 # def make_input_image(self, img, message = None, time_stamp = None, save_file_name = None):    
-def make_input_image(img, save_file_name, message = None, time_stamp = None, x_start = 440, y_start = 70, lamda = 1.33, uml=50, width = 6):
+def make_input_image(img, save_file_name, message = None, time_stamp = None, x_start = 440, y_start = 70, lamda = 1.33, uml=50, width = 6, fontsize = 18, y_time_stamp = 20):
     """mark the input image, img, at position needletip with a 50µm white scale bar.  
     time_stamp and message are passed as content to plt.text.
     marked image saved to save_file_name.
@@ -56,11 +56,11 @@ def make_input_image(img, save_file_name, message = None, time_stamp = None, x_s
     fig.lines.extend([l1])
     
     ##  add text boxes
-    fontsize = 18
+    
     if message is not None:
         ax.text(x=15, y=50, c='white', s=message, weight='bold', fontsize=fontsize, horizontalalignment='left', verticalalignment='center')
     if time_stamp is not None:
-        ax.text(x=15, y=20, c='white', s=time_stamp, weight='bold', fontsize=fontsize, horizontalalignment='left', verticalalignment='center')
+        ax.text(x=15, y=y_time_stamp, c='white', s=time_stamp, weight='bold', fontsize=fontsize, horizontalalignment='left', verticalalignment='center')
     
     plt.savefig(save_file_name, bbox_inches='tight', pad_inches=0.)
     return True

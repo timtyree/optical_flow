@@ -149,51 +149,6 @@ def get_green_channel_from(input_array, baseline = 1000, x_shiftby = 2, rotateby
 # class FluorescentClient():
 # 	pass
 
-
-
-
-
-#####################################################################
-# TODO: calculate flow for all frames and save as a .tif
-#####################################################################
-# TODO: step 2: use ^that routine to calculate flow for all frames and save as a .tif
-#put all of step 1.b together into a function that takes two frames and returns the output texture
-# def calculate_output_texture(prv, nxt, raw_frame):
-#     #calculate DIS optical flow
-#     dis = cv.cv2.DISOpticalFlow_create(cv.cv2.DISOpticalFlow_PRESET_MEDIUM)
-#     img_flow = dis.calc(prv,nxt, flow=None)
-#     flow_x = img_flow[...,0]
-#     flow_right = flow_x.copy()
-#     flow_right[flow_right<=0] = 0
-#     flow_left = -flow_x.copy()
-#     flow_left[flow_left<=0] = 0
-	
-#     #calculate cell area
-#     cell_area = gaussian(nxt+prv, sigma=3)
-#     threshold = 0.1
-#     cell_area[cell_area>threshold]  = 1
-#     cell_area[cell_area<=threshold] = 0
-	
-#     #select flow only where there are cells
-#     flow_left_cells  = (cell_area*flow_left)
-#     flow_right_cells = (cell_area*flow_right)
-
-#     #compress data type (optional, but reccomended)
-#     flow_left_cells   = flow_left_cells.astype('float16')
-#     flow_right_cells  = flow_right_cells.astype('float16')
-#     cell_area_cells   = cell_area.astype('float16')
-#     raw_frame         = raw_frame.astype('float16')
-#     output_texture    = np.stack([flow_left_cells, flow_right_cells, cell_area_cells, raw_frame], axis=-1)
-#     return output_texture
-
-# #(optional) reload raw DIC frames
-# @pims.pipeline
-# def gray(image):
-#     return np.uint8(image[:, :, 0])  # Take just the red channel
-# frames = pims.TiffStack_libtiff(data_file_name)
-
-
-
 ##########################
 # (start of) Example Usage
 ##########################

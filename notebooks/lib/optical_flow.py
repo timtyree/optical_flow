@@ -2,14 +2,14 @@
 #  * Python       :   Optical Flow for Cell Motion independent of Cell Tracking
 #  *
 #  * PROGRAMMER   :   Timothy Tyree
-#  * DATE         :   Fri 22 Nov 2019 
+#  * DATE         :   Fri 22 Nov 2019
 #  * PLACE        :   Rappel Lab @ UCSD, CA
 #  *@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #  */
 
 #TODO: import only relevant functions
 import pandas as pd
-import numpy as np 
+import numpy as np
 import pims
 from skimage.filters import scharr_h, scharr_v, gaussian
 from joblib import Parallel, delayed
@@ -19,7 +19,7 @@ import tifffile
 from cv2 import drawMarker, calcOpticalFlowFarneback
 import cv2 as cv
 from tkinter import filedialog, Tk
-from scipy.interpolate import CubicSpline 
+from scipy.interpolate import CubicSpline
 # import trackpy as tp
 # import skimage as sk
 
@@ -30,7 +30,7 @@ if not 'nb_dir' in globals():
 	nb_dir = os.getcwd()
 print('notebook is at: ' + nb_dir)
 
-#TODO: append mean flow to .tiff file as they're calculated instead of calculating them 
+#TODO: append mean flow to .tiff file as they're calculated instead of calculating them
 # all for saving all at once.
 #  rgb float64 textures for each frame:
 #  r channel: flow x
@@ -48,7 +48,7 @@ print('notebook is at: ' + nb_dir)
 #TODO: test cross_flow functionality
 
 #TODO: allow inputs like '.mpg' video inputs
-#TODO: allow video stream inputs 
+#TODO: allow video stream inputs
 #Hint: elif v_data_type == 'video':
 #     cap = cv2.VideoCapture("vtest.avi")
 #     ret, frame1 = cap.read()
@@ -56,7 +56,7 @@ print('notebook is at: ' + nb_dir)
 #TODO: add a .input_file_name function using my current method
 #TODO: elabourate all docstrings
 #TODO: make more test cases!
-#TODO: organize functions by subject.  
+#TODO: organize functions by subject.
 #TODO: collect similar functions into subclasses
 #TODO: give user option to specify fields to use for df instead of 'frame', 'x', and 'y'
 #TODO: put parameter parsing + defaults into all helper functions so all moving parts are accessable from the top layer
@@ -73,7 +73,7 @@ print('notebook is at: ' + nb_dir)
 # for key in keys_given:
 #     OF_PARAMS[key] = kwargs[key]
 # print(OF_PARAMS)
-# test = pims.TiffStack(frame_dir) 
+# test = pims.TiffStack(frame_dir)
 # pims.TiffStack?
 # frame_dir
 # pims.TiffStack?
@@ -85,6 +85,12 @@ class OpticalFlowClient(object):
 		self.dot and self.cross methods separate flow about some origin specified by
 		self.position.
 		PARAMS_DEFAULT = {'navg':8, 'width':512, 'height':512, 'rthresh': 0, 'lamda':1.33, 'dt':1/3, 'method':'dis'}
+
+Example Usage:
+cf = OpticalFlowClient.interpolate_trajectory(df)
+plt.scatter(x=cf.x, y=cf.y, c=cf.frame, cmap='Blues')
+plt.scatter(x=df.x, y=df.y, c='r')
+
 	'''
 	def __init__(self,  **kwargs):
 		'''set client parameters'''
@@ -151,8 +157,6 @@ class OpticalFlowClient(object):
 		tifffile.imsave(save_file_name, rgba, rgba.shape, **self.save_params)
 		return self
 
-
-
 	def write_list(self, save_file_name, flow_lst, r_hat_mat_lst):
 		'''TODO: streamline this using nb sketches.'''
 	#append rbg texture of raw flow data to file
@@ -174,17 +178,17 @@ class OpticalFlowClient(object):
 	def run_optical_flow_main(self, df,file_name, save_file_name = None , background_file_name = None,
 							  first_frame = None, last_frame =  None, average_then_dot = False,
 							  assert_override=True, **kwargs):
-		'''input file_name of dic frames (as a .tif or .tiff stack), a background_file_name of comparable type, 
-		and a trajectory DataFrame to highlight cell motion inwards/outwards from df. kwargs passed to 
+		'''input file_name of dic frames (as a .tif or .tiff stack), a background_file_name of comparable type,
+		and a trajectory DataFrame to highlight cell motion inwards/outwards from df. kwargs passed to
 		cv2.calcOpticalFlowFarneback. save to save_file_name.
 
 		Parameters:
 
-		file_name = (directory for optical flow calculatons) 
+		file_name = (directory for optical flow calculatons)
 			^the (absolute) directory of the .tiff file of microscopy data (currently grayscale)
 		background_file_name = (directory for background overlay)
 			^the (absolute) directory of the .tiff file of microscopy data (currently grayscale)
-		df is a pandas.DataFrame containing the fields 
+		df is a pandas.DataFrame containing the fields
 			df.frame = frame number is 1 to final frame (consistent with file_name)
 			df.x     = x coordinate of marker in pixels
 			df.y     = y coordinate of marker in pixels
@@ -195,32 +199,32 @@ class OpticalFlowClient(object):
 		r_thresh  = self.r_thresh
 
 
-		
+
 
 		@pims.pipeline
 		def gray(image):
 			return np.uint8(image[:, :, 1])  # Take just the green channel
-		
+
 		#set defaults to positional arguments if not specified
 		if save_file_name == None:
 			save_file_name = 'out_'+file_name
 		if background_file_name == None:
 			background_file_name = file_name
-		
+
 		#import DIC frames
 		#TODO(later): IF pims.TiffStack_libtiff is actually too slow, try fast import method and use the slow one if the fast one fails
 		#TODO: search for file and only use parse only if file is not found.
-		#	TODO: make parse take absolute directories for autocompletion   
+		#	TODO: make parse take absolute directories for autocompletion
 		#     file_name = parse(file_name)
 		#     background_file_name = parse(background_file_name)
 		#	NB: pims.TiffStack(file_name) is faster (for finding median and max in preprocessing) but fails at importing .tiff's I personally exported in this nb.
 		#     boo, frames = cv.imreadmulti(file_name)
-		frames = pims.TiffStack_libtiff(file_name)   
-	 
+		frames = pims.TiffStack_libtiff(file_name)
+
 		#import background frames
 		#     boo, background_frames = cv.imreadmulti(background_file_name)
-		background_frames = pims.TiffStack_libtiff(background_file_name)  
-		
+		background_frames = pims.TiffStack_libtiff(background_file_name)
+
 		print('frames imported.')
 		#select particular frames if specified
 		if (first_frame != None and last_frame != None):
@@ -232,7 +236,7 @@ class OpticalFlowClient(object):
 		elif (last_frame != None):
 			frames = frames[:last_frame]
 			background_frames = background_frames[:last_frame]
-		
+
 		# assert lengths agree
 		#TODO: add assert_override option to kwargs
 		#TODO: turn this into proper exception handling/a proper switch statement of loading routines
@@ -287,7 +291,7 @@ class OpticalFlowClient(object):
 				mf, mfi, mfo, r_c_mat = self.get_mean_flow(j, imgs = imgs, df = df, **self.OF_PARAMS)
 				rgba = np.concatenate([mf,r_hat_mat], axis=2)
 				tifffile.imsave(raw_save_file_name, rgba, rgba.shape, **save_params)
-			
+
 			#define inner averaging annulus in microns
 			lamda = self.lamda
 			r1, r2 = (50/lamda,100/lamda)
@@ -300,8 +304,8 @@ class OpticalFlowClient(object):
 			mfi_outer_avg = self.annulus_avg(mfi, mag, r1, r2, r_c_mat)
 			mfo_outer_avg = self.annulus_avg(mfo, mag, r1, r2, r_c_mat)
 			out = [j, mfi_inner_avg, mfo_inner_avg, mfi_inner_avg, mfo_outer_avg]
-			lst_out.append(out)  
-			
+			lst_out.append(out)
+
 			img = self.highlight_flow(j, background_frame, df, mfi, mfo, r_c_mat).astype('uint8')
 			#         img = highlight_flow(j, background_img, imgs = imgs, df = df).astype('uint8')
 			#     img.metadata = None
@@ -311,8 +315,8 @@ class OpticalFlowClient(object):
 		#TODO: verify something dumb like a transpost isn't needed before casting to dataframe     lst_out = pd.DataFrame(dict(zip(lst_keys, lst_out)))
 		end = time.time()
 		print(str(np.around(end - start,1)) + ' seconds elapsed highlighting dense optical flow. ')
-		#(TODO: make the following optional through the kwargs. ) 
-		# output to avi ( / quicktime ) 
+		#(TODO: make the following optional through the kwargs. )
+		# output to avi ( / quicktime )
 		self.tiffstack_to_avi(save_file_name)
 		return lst_out
 
@@ -321,14 +325,14 @@ class OpticalFlowClient(object):
 		Sum of all channels contained in axis=2 of txt is returned.
 		'''
 		return txt[(rtxt>r1) & (r2>rtxt)].sum()
-		 
+
 	def search_for_frame_path (self, currdir = os.getcwd()):
 		'''#make functions for save file name, input cell frames, and input cell trajectories'''
 		#TODO: eventually make this ^take cell trajectories or cell positions
 		root = Tk()
-		tempdir = filedialog.askopenfilename(parent=root, 
-											 initialdir=currdir, 
-											 title="Please select .tiff of cell frames", 
+		tempdir = filedialog.askopenfilename(parent=root,
+											 initialdir=currdir,
+											 title="Please select .tiff of cell frames",
 											 filetypes = (("tiff files","*.tiff"),("tif files","*.tif"),("all files","*.*")))
 		root.destroy()
 		if len(tempdir) > 0:
@@ -337,9 +341,9 @@ class OpticalFlowClient(object):
 
 	def search_for_traj_path (self, currdir = os.getcwd()):
 		root = Tk()
-		tempdir = filedialog.askopenfilename(parent=root, 
-											 initialdir=currdir, 
-											 title='Please select .csv of cell trajectories', 
+		tempdir = filedialog.askopenfilename(parent=root,
+											 initialdir=currdir,
+											 title='Please select .csv of cell trajectories',
 											 filetypes = (("csv files","*.csv"),("excel files","*.xlsx"),("all files","*.*")))
 		root.destroy()
 		if len(tempdir) > 0:
@@ -350,12 +354,12 @@ class OpticalFlowClient(object):
 		return preprocess(self, frames, thresh=90)
 
 	def preprocess(self, frames, thresh=90):
-		'''frames is an iterable of numpy.array objects. 
-		uses scharr filter to get cell edges from DIC channel, 
+		'''frames is an iterable of numpy.array objects.
+		uses scharr filter to get cell edges from DIC channel,
 		scaling down to uint8 dtypes.
-		returns a stack of image list of frames. 
-	    preprocessing should be done with this output 
-	    to avoid normalizing intensity with respect 
+		returns a stack of image list of frames.
+	    preprocessing should be done with this output
+	    to avoid normalizing intensity with respect
 	    to variable empirical parameters.'''
 		md1 = np.median(frames[0])
 		mx1 = np.max(frames[0])#nearly 65535 for uint16
@@ -399,7 +403,7 @@ class OpticalFlowClient(object):
 		#TODO: if self.dis = None: make it, else use self.dis
 		flow = self.dis.calc(previous,current, current_flow)
 		mag, ang = cv.cartToPolar(flow[...,0], flow[...,1])
-		
+
 		#remove small flows under threshold
 		minthresh = self.minthresh
 		flow[...,0][mag<minthresh] = 0
@@ -460,7 +464,7 @@ class OpticalFlowClient(object):
 		flow_perp_y  = -(-np.multiply(flow[...,1],r_hat_mat[...,0]))
 		#TODO: consider undoing both yaxis flips (all three here)
 		# flow_out    = np.sqrt(np.multiply(flow_out_y, flow_out_y) + np.multiply(flow_out_x, flow_out_x))
-		
+
 		#define flow as out/in if it is within 45degrees of directly out/in
 		# <--> v_r/vtot = CI < np.sqrt(0.5)
 		angthresh = self.angthresh
@@ -507,7 +511,7 @@ class OpticalFlowClient(object):
 
 	def get_r_hat_mat(self, position):
 		'''get_r_hat_mat([x_coord,y_coord])--> r_hat_mat, r_c_mat
-		returns texture width xy channels populated by the unit vector pointing radially away from position.''' 
+		returns texture width xy channels populated by the unit vector pointing radially away from position.'''
 		#make a texture of the r_hat outward from the cluster
 		width = self.width
 		height= self.height
@@ -523,10 +527,10 @@ class OpticalFlowClient(object):
 		r_hat_mat   = np.stack([r_hat_mat_x,r_hat_mat_y], axis=2)
 		self.r_hat_mat  = r_hat_mat
 		self.r_c_mat  = r_c_mat
-		return r_hat_mat, r_c_mat   
+		return r_hat_mat, r_c_mat
 
 	def average_texture_list(self, imgs):
-		'''returns the mean image for a list of images stored in imgs'''    
+		'''returns the mean image for a list of images stored in imgs'''
 		#average the entries of imgs
 		mf = np.stack(imgs[:])
 		mf = np.mean(mf, axis=0)
@@ -543,24 +547,24 @@ class OpticalFlowClient(object):
 	def get_mean_flow(self, frm, imgs, df, **kwargs):
 		'''initial and final frames of apparent outward/inward flow.  takes one int argument frm as frame number.
 		flow is dotted for each frame and then averaged over navg frames.  For slow moving origins, it would be better
-		to average flows over navg frames and then take the dot (or cross) product.'''    
+		to average flows over navg frames and then take the dot (or cross) product.'''
 		#define optical flow parameters.  set defaults if not specified.
-		
+
 		OF_PARAMS_DEFAULT = {'pyr_scale': 0.5, 'levels':3 , 'winsize': 15, 'iterations': 3, 'poly_n': 5, 'poly_sigma':1.2, 'flags':0}
 		OF_PARAMS = OF_PARAMS_DEFAULT
 		keys_given = set(kwargs.keys()).intersection(OF_PARAMS_DEFAULT.keys())
 		for key in keys_given:
 			OF_PARAMS[key] = kwargs[key]
-		
+
 		navg      = self.navg
 		r_thresh  = self.r_thresh
 		angthresh = self.angthresh
 
 		f_init = frm
 		f_final= f_init+navg
-		
+
 		#TODO: calculate mean position of df for marking with a yellow x to marginally decrease runtime.
-		#TODO: test for when the variance or speed of the yellow x trajectory is too large, 
+		#TODO: test for when the variance or speed of the yellow x trajectory is too large,
 		#TODO: when ^that is too large, switch to multiple evaluations of r_hat_mat inside the for loop
 		#     d = df.query('frame=={}'.format(int(np.around(np.mean([f_init, f_final])))))[['x', 'y']]
 		flow_out_lst = []
@@ -582,7 +586,7 @@ class OpticalFlowClient(object):
 				Exception('invalid method entered')
 
 			mag, ang = cv.cartToPolar(flow[...,0], flow[...,1])
-			
+
 			#remove small flows under threshold
 			minthresh = self.minthresh
 			flow[...,0][mag<minthresh] = 0
@@ -622,14 +626,14 @@ class OpticalFlowClient(object):
 			flow_out[CI<angthresh] = 0.
 			# flow_out[(flow_out_x+flow_out_y)<0] = 0.
 			flow_out_lst.append(flow_out)
-		
+
 		#average the entries of flow_out
 		mf = np.stack(flow_lst[:])
 		mf = np.mean(mf, axis=0)
 		mfo = np.stack(flow_out_lst[:])
 		mfo = np.mean(mfo, axis=0)
 		mfi = np.stack(flow_in_lst[:])
-		mfi = np.mean(mfi, axis=0)    
+		mfi = np.mean(mfi, axis=0)
 		return mf, mfi, mfo, r_c_mat
 
 
@@ -663,7 +667,7 @@ class OpticalFlowClient(object):
 
 		# navg      = self.navg
 		# img = pims.to_rgb(frames[int(np.around(np.mean([f_init, f_final])))])
-		
+
 		if r_c_mat == None:
 			r_filter = 1
 		elif r_c_mat.shape == (self.width, self.height):
@@ -675,13 +679,13 @@ class OpticalFlowClient(object):
 		#subtract nonblue for outward flow
 		filt[:,:,0] = hue_scale_blue*mfo*r_filter
 		filt[:,:,1] = hue_scale_blue*mfo*r_filter
-		
+
 		#subtract nonred for inward flow
 		filt[:,:,1] = hue_scale_red*mfi*r_filter
 		filt[:,:,2] = hue_scale_red*mfi*r_filter
 		# filt[:,:,2] = filt[:,:,2]/np.max(filt[:,:,2])+1
 		flowing = np.add(img, -filt)
-		
+
 		#clip to 0 to 255
 		# if np.isnan(np.sum(out_vec)):
 		# 	out_vec = out_vec[~np.isnan(out_vec)] # just remove nan elements from out_vec
@@ -690,14 +694,14 @@ class OpticalFlowClient(object):
 
 		#highlight needletip with a yellow x
 		#TODO: make marker parameters accessable through **kwargs
-		return drawMarker(flowing, position = position, 
-						  color = (255,255,0), markerType = 1 , markerSize = 15, thickness = 2)	
+		return drawMarker(flowing, position = position,
+						  color = (255,255,0), markerType = 1 , markerSize = 15, thickness = 2)
 
 	def highlight_flow(self, frm, background_frame, df, mfi, mfo, r_c_mat, **kwargs):
 		'''visualize overlay of outward optical flow over the background channel.'''
 		#TODO: use more sophisticated/correct kwargs parsing as done elsewhere
-		
-		
+
+
 		# hue_scale = self.hue_scale
 		hue_scale_red = self.hue_scale_red
 		hue_scale_blue = self.hue_scale_blue
@@ -708,18 +712,18 @@ class OpticalFlowClient(object):
 
 		# navg      = self.navg
 		# img = pims.to_rgb(frames[int(np.around(np.mean([f_init, f_final])))])
-		
+
 		#TODO: use colormap such as # im_color = cv2.applyColorMap(im_gray, cv2.COLORMAP_COOL)
 		#subtract nonblue for outward flow
 		filt[:,:,0] = hue_scale_blue*mfo*(r_c_mat>r_thresh)
 		filt[:,:,1] = hue_scale_blue*mfo*(r_c_mat>r_thresh)
-		
+
 		#subtract nonred for inward flow
 		filt[:,:,1] = hue_scale_red*mfi*(r_c_mat>r_thresh)
 		filt[:,:,2] = hue_scale_red*mfi*(r_c_mat>r_thresh)
 		# filt[:,:,2] = filt[:,:,2]/np.max(filt[:,:,2])+1
 		flowing = np.add(img, -filt)
-		
+
 		#clip to 0 to 255
 		# if np.isnan(np.sum(out_vec)):
 		# 	out_vec = out_vec[~np.isnan(out_vec)] # just remove nan elements from out_vec
@@ -728,16 +732,16 @@ class OpticalFlowClient(object):
 
 		#TODO: position = get_centroid(frm) should be able to use subpixel accuracy
 		position = (int(self.get_centroid(frm, df=df)[0]),int(self.get_centroid(frm, df=df)[1]))
-		
+
 		#highlight needletip with a yellow x
 		#TODO: make marker parameters accessable through **kwargs
-		return drawMarker(flowing, position = position, 
-						  color = (255,255,0), markerType = 1 , markerSize = 15, thickness = 2)    
+		return drawMarker(flowing, position = position,
+						  color = (255,255,0), markerType = 1 , markerSize = 15, thickness = 2)
 
 	def tiffstack_to_avi(self, path, save_dir= None):
-		'''saves tiffstack in local 'path' to similarly named avi. 
+		'''saves tiffstack in local 'path' to similarly named avi.
 		TODO: formalize this io a bit. '''
-		
+
 		if save_dir == None:
 			save_dir= path[:path.find(r'.')]+'.avi'
 		start = time.time()
@@ -757,7 +761,7 @@ class OpticalFlowClient(object):
 		assert(writer.isOpened())#assert the writer is properly initialized
 
 		for i  in range(len(cap)):
-			#TODO: make this step faster by using something like the (missing) cv.GrabFrame command 
+			#TODO: make this step faster by using something like the (missing) cv.GrabFrame command
 			frame = cap[i]
 			writer.write(frame)
 		writer.release()
@@ -766,9 +770,9 @@ class OpticalFlowClient(object):
 		return self
 
 	def get_flow_field_moving_average(self, frm, imgs, flow_prev= None, **kwargs):
-		'''apparent flow averaged from frm to frm + navg. Fails for fast moving origins.'''    
+		'''apparent flow averaged from frm to frm + navg. Fails for fast moving origins.'''
 		#define optical flow parameters.  set defaults if not specified.
-		
+
 		OF_PARAMS_DEFAULT = {'pyr_scale': 0.5, 'levels':3 , 'winsize': 15, 'iterations': 3, 'poly_n': 5, 'poly_sigma':1.2, 'flags':0}
 		OF_PARAMS = OF_PARAMS_DEFAULT
 		keys_given = set(kwargs.keys()).intersection(OF_PARAMS_DEFAULT.keys())
@@ -781,9 +785,9 @@ class OpticalFlowClient(object):
 		using_flow_prev = (flow_prev != None)
 		f_init = frm
 		f_final= f_init+navg
-		
+
 		#precalculate mean position of df to marginally decrease runtime.
-		#TODO: test for when the variance or speed of the yellow x trajectory is too large, 
+		#TODO: test for when the variance or speed of the yellow x trajectory is too large,
 		#TODO: when ^that is too large, switch to multiple evaluations of r_hat_mat inside the for loop
 		#scratchwork     d = df.query('frame=={}'.format(int(np.around(np.mean([f_init, f_final])))))[['x', 'y']]
 		flow_lst = []
@@ -815,7 +819,7 @@ class OpticalFlowClient(object):
 	def dot_flow(self, frm, flow, df, **kwargs):
 		'''flow is dotted with the unit vector extending radially away from the position of df in frame frm.
 		For sufficiently slow moving origins, we average flows over navg frames and then take the dot (or cross) product.'''
-		
+
 		navg      = self.navg
 		hue_scale = self.hue_scale
 		r_thresh  = self.r_thresh
@@ -856,20 +860,20 @@ class OpticalFlowClient(object):
 		return vis
 
 	def interpolate_trajectory(self, df, f1=None, f2=None):
-	    """returns a pandas.DataFrame with exactly one position for every frame. 
+	    """returns a pandas.DataFrame with exactly one position for every frame.
 	    Positions are calculated by cubic spline interpolation.
 	    df is a pandas.DataFrame of pixel positions for sparse frames.
 	    f1 is the first frame number to interpolate, and is the first value in df.frame by default.
 	    f2 is the last frame number to interpolate, and is the last value in df.frame by default.
-	    Nota Bene: it is always good to plot your interpolations before relying on them.  
-	    Consider the following usage example:
+	    Nota Bene: it is always good to plot your interpolations before relying on them.
+Example Usage:
 	    cf = OpticalFlowClient.interpolate_trajectory(df)
 	    plt.scatter(x=cf.x, y=cf.y, c=cf.frame, cmap='Blues')
 	    plt.scatter(x=df.x, y=df.y, c='r')
 	    """
 	    knots= df.frame.values
 	    if f1==None:
-	        f1   = knots.min(); 
+	        f1   = knots.min();
 	    if f2==None:
 	        f2   = knots.max()
 	    x_values   = df.x
@@ -895,7 +899,7 @@ class OpticalFlowClient(object):
 	    if dt == None:
 	    	dt = self.dt
 
-	    #idiot proof the calculations here. 
+	    #idiot proof the calculations here.
 	    assert(r1<=r2)
 	    channel_no = texture_lst[0].shape[-1]
 	    if columns==None:
@@ -944,7 +948,7 @@ class OpticalFlowClient(object):
 	    for frm in f_values[:-1]:
 	        # get radial coordinates
 	        position  = self.get_centroid(frm,df)
-	        rhat,rmat = self.get_r_hat_mat(position)    
+	        rhat,rmat = self.get_r_hat_mat(position)
 
 	        # get flow field in radial coordinates
 	        #TODO: check that I'm not setting the turnwise channel to zero accidently.  It looks black everywhere while ws does not.
@@ -962,8 +966,8 @@ class OpticalFlowClient(object):
 	        fltr[fltr>=20] = 1
 	        area_channel = fltr#pims.frame.Frame(fltr.astype('uint16'))
 
-	        #filter off-cell flow 
-	        output_texture = np.stack([(area_channel*flow_in).astype('float32'), 
+	        #filter off-cell flow
+	        output_texture = np.stack([(area_channel*flow_in).astype('float32'),
 	                                   (area_channel*flow_out).astype('float32'),
 	                                  rmat.astype('uint8'),
 	                                  area_channel.astype('uint8')], axis=2)
@@ -1009,6 +1013,3 @@ class OpticalFlowClient(object):
 		assert(img!=None)
 		print('all test cases passed!')
 		return True
-
-
-

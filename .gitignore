@@ -5,3 +5,5 @@ horizontal_cell_motion_data copy/pos1234_C0.tif
 *.jpg
 *.avi
 *.tif
+*/.ipynb_checkpoints/*
+notebooks/.ipynb_checkpoints/dev-checkpoint.ipynb
